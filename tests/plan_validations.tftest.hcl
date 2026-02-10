@@ -211,6 +211,62 @@ run "encryption_provider_gcp" {
   }
 }
 
+run "privatelink_only_skips_cpa" {
+  command = plan
+  variables {
+    privatelink_endpoints = [
+      { region = "us-east4", subnetwork = "sub-a" }
+    ]
+  }
+  assert {
+    condition     = output.role_id == null
+    error_message = "Expected null role_id when only privatelink configured"
+  }
+  assert {
+    condition     = output.regional_mode_enabled == false
+    error_message = "Expected regional mode disabled for single region"
+  }
+  assert {
+    condition     = length(output.privatelink_service_info) == 1
+    error_message = "Expected one privatelink_service_info entry"
+  }
+  assert {
+    condition     = contains(keys(output.privatelink_service_info), "us-east4")
+    error_message = "Expected privatelink_service_info key 'us-east4'"
+  }
+}
+
+run "existing_cpa_flows_through" {
+  command = plan
+  variables {
+    cloud_provider_access = {
+      create   = false
+      existing = { role_id = "existing-role-123", service_account_for_atlas = "sa@gcp.iam" }
+    }
+  }
+  assert {
+    condition     = output.role_id == "existing-role-123"
+    error_message = "Expected existing role_id to flow through"
+  }
+}
+
+run "atlas_region_format_in_privatelink" {
+  command = plan
+  variables {
+    privatelink_endpoints = [
+      { region = "US_EAST_4", subnetwork = "sub-a" }
+    ]
+  }
+  assert {
+    condition     = output.role_id == null
+    error_message = "Expected null role_id when only privatelink configured"
+  }
+  assert {
+    condition     = output.regional_mode_enabled == false
+    error_message = "Expected regional mode disabled for single region"
+  }
+}
+
 run "regional_mode_multi_region" {
   command = plan
   variables {
@@ -223,18 +279,13 @@ run "regional_mode_multi_region" {
     condition     = output.regional_mode_enabled == true
     error_message = "Expected regional mode enabled for multi-region"
   }
-}
-
-run "regional_mode_single_region" {
-  command = plan
-  variables {
-    privatelink_endpoints = [
-      { region = "us-east4", subnetwork = "sub-a" }
-    ]
+  assert {
+    condition     = length(output.privatelink_service_info) == 2
+    error_message = "Expected two privatelink_service_info entries"
   }
   assert {
-    condition     = output.regional_mode_enabled == false
-    error_message = "Expected regional mode disabled for single region"
+    condition     = length(setintersection(keys(output.privatelink_service_info), ["us-east4", "us-west1"])) == 2
+    error_message = "Expected privatelink_service_info keys to match endpoint regions"
   }
 }
 
@@ -249,5 +300,13 @@ run "regional_mode_byoe_multi_region" {
   assert {
     condition     = output.regional_mode_enabled == true
     error_message = "Expected regional mode enabled for multi-region BYOE"
+  }
+  assert {
+    condition     = length(output.privatelink_service_info) == 2
+    error_message = "Expected two privatelink_service_info entries for BYOE"
+  }
+  assert {
+    condition     = length(setintersection(keys(output.privatelink_service_info), ["primary", "secondary"])) == 2
+    error_message = "Expected privatelink_service_info keys to match BYOE region keys"
   }
 }
