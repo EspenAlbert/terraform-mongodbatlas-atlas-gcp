@@ -1,19 +1,24 @@
-# {Module-Name} Terraform Module
+# MongoDB Atlas GCP Terraform Module
 
-Description of the module
+Integrates MongoDB Atlas with Google Cloud Platform:
 
-## Usage 
+- **Encryption at Rest** using Google Cloud KMS (customer-managed keys)
+- **PrivateLink** via Private Service Connect (PSC) with port-mapped architecture
+- **Backup Export** to Google Cloud Storage (GCS)
 
+## Usage
 
-## Resources
+```hcl
+module "atlas_gcp" {
+  source     = "terraform-mongodbatlas-modules/atlas-gcp/mongodbatlas"
+  project_id = "64259ee860c43338194b0f8e"
 
-
-## Considerations 
-
-
-## License
-
-See LICENSE <link_to_license> for full details.
+  encryption = {
+    enabled                 = true
+    key_version_resource_id = google_kms_crypto_key_version.atlas.id
+  }
+}
+```
 
 <!-- BEGIN_TF_DOCS -->
 <!-- @generated
@@ -23,7 +28,13 @@ Run 'just docs' to regenerate.
 -->
 ## Requirements
 
-No requirements.
+The following requirements are needed by this module:
+
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9)
+
+- <a name="requirement_google"></a> [google](#requirement\_google) (>= 6.0)
+
+- <a name="requirement_mongodbatlas"></a> [mongodbatlas](#requirement\_mongodbatlas) (~> 2.6)
 
 ## Providers
 
@@ -35,19 +46,245 @@ No resources.
 
 <!-- BEGIN_TF_INPUTS_RAW -->
 <!-- @generated
-WARNING: Inputs section below is processed and grouped by generate_inputs_from_readme.py. Do not edit directly.
+WARNING: This grouped inputs section is auto-generated. Do not edit directly.
 Changes will be overwritten when documentation is regenerated.
+Run 'just docs' to regenerate.
 -->
-## Required Inputs
+## Required Variables
 
-No required inputs.
+### project_id
 
-## Optional Inputs
+MongoDB Atlas project ID
 
-No optional inputs.
+Type: `string`
+
+
+## GCP Cloud Provider Access
+
+Configure the GCP service account used by MongoDB Atlas. See the [GCP cloud provider access documentation](https://www.mongodb.com/docs/atlas/security/set-up-unified-gcp-access/) for details.
+
+### cloud_provider_access
+
+Cloud provider access configuration for Atlas-GCP integration.
+- `create = true` (default): Creates a shared Atlas service account and authorization
+- `create = false`: Use existing CPA via `existing.role_id` and `existing.service_account_for_atlas`
+
+Type:
+
+```hcl
+object({
+  create = optional(bool, true)
+  existing = optional(object({
+    role_id                   = string
+    service_account_for_atlas = string
+  }))
+})
+```
+
+Default: `{}`
+
+
+## Encryption at Rest
+
+Configure encryption at rest using Google Cloud KMS. See the [GCP encryption documentation](https://www.mongodb.com/docs/atlas/security-gcp-kms/) for details.
+
+### encryption
+
+Encryption at rest configuration with Google Cloud KMS.
+
+Provide EITHER:
+- `key_version_resource_id` (user-provided KMS key version)
+- `create_kms_key.enabled = true` (module-managed Key Ring + Crypto Key)
+
+`dedicated_role_enabled = true` creates a dedicated Atlas service account for encryption.
+
+Type:
+
+```hcl
+object({
+  enabled                 = optional(bool, false)
+  key_version_resource_id = optional(string)
+  create_kms_key = optional(object({
+    enabled         = optional(bool, false)
+    key_ring_name   = optional(string, "")
+    crypto_key_name = optional(string, "")
+    location        = optional(string, "")
+    rotation_period = optional(string)
+  }), {})
+  dedicated_role_enabled = optional(bool, false)
+})
+```
+
+Default: `{}`
+
+
+## Private Service Connect
+
+Configure GCP Private Service Connect (PSC) endpoints for secure connectivity. See the [GCP PrivateLink documentation](https://www.mongodb.com/docs/atlas/security-private-endpoint/) for details.
+
+### privatelink_endpoints
+
+Multi-region PrivateLink endpoints via PSC. Region accepts us-east4 or US_EAST_4 format. All regions must be UNIQUE.
+
+Type:
+
+```hcl
+list(object({
+  region     = string
+  subnetwork = string
+  labels     = optional(map(string), {})
+}))
+```
+
+Default: `[]`
+
+### privatelink_endpoints_single_region
+
+Single-region multi-endpoint pattern. All regions must MATCH.
+Use when multiple VPCs in the same region need PSC connectivity to Atlas.
+
+Type:
+
+```hcl
+list(object({
+  region     = string
+  subnetwork = string
+  labels     = optional(map(string), {})
+}))
+```
+
+Default: `[]`
+
+### privatelink_byoe_regions
+
+BYOE Phase 1: Key is user identifier, value is GCP region (us-east4 or US_EAST_4).
+
+Type: `map(string)`
+
+Default: `{}`
+
+### privatelink_byoe
+
+BYOE Phase 2: Forwarding rule details. Key must exist in privatelink_byoe_regions.
+
+Type:
+
+```hcl
+map(object({
+  ip_address           = string
+  forwarding_rule_name = string
+}))
+```
+
+Default: `{}`
+
+
+## Backup Export
+
+Configure backup snapshot export to Google Cloud Storage (GCS).
+
+### backup_export
+
+Backup snapshot export to GCS configuration.
+
+Provide EITHER:
+- `bucket_name` (user-provided GCS bucket)
+- `create_bucket.enabled = true` (module-managed GCS bucket)
+
+`dedicated_role_enabled = true` creates a dedicated Atlas service account for backup export.
+
+Type:
+
+```hcl
+object({
+  enabled     = optional(bool, false)
+  bucket_name = optional(string)
+  create_bucket = optional(object({
+    enabled            = optional(bool, false)
+    name               = optional(string, "")
+    location           = optional(string, "")
+    force_destroy      = optional(bool, false)
+    storage_class      = optional(string, "STANDARD")
+    versioning_enabled = optional(bool, true)
+  }), {})
+  dedicated_role_enabled = optional(bool, false)
+})
+```
+
+Default: `{}`
+
+
+## Optional Variables
+
+### gcp_tags
+
+Labels to apply to all GCP resources created by this module.
+
+Type: `map(string)`
+
+Default: `{}`
+
 <!-- END_TF_INPUTS_RAW -->
 
 ## Outputs
 
-No outputs.
+The following outputs are exported:
+
+### <a name="output_backup_export"></a> [backup\_export](#output\_backup\_export)
+
+Description: Backup export configuration
+
+### <a name="output_encryption"></a> [encryption](#output\_encryption)
+
+Description: Encryption at rest status and configuration
+
+### <a name="output_encryption_at_rest_provider"></a> [encryption\_at\_rest\_provider](#output\_encryption\_at\_rest\_provider)
+
+Description: Value for cluster's encryption\_at\_rest\_provider attribute
+
+### <a name="output_export_bucket_id"></a> [export\_bucket\_id](#output\_export\_bucket\_id)
+
+Description: Export bucket ID for backup schedule auto\_export\_enabled
+
+### <a name="output_privatelink"></a> [privatelink](#output\_privatelink)
+
+Description: PrivateLink status per endpoint key
+
+### <a name="output_privatelink_service_info"></a> [privatelink\_service\_info](#output\_privatelink\_service\_info)
+
+Description: Atlas PrivateLink service info for BYOE pattern
+
+### <a name="output_regional_mode_enabled"></a> [regional\_mode\_enabled](#output\_regional\_mode\_enabled)
+
+Description: Whether private endpoint regional mode is enabled
+
+### <a name="output_resource_ids"></a> [resource\_ids](#output\_resource\_ids)
+
+Description: All resource IDs for data source lookups
+
+### <a name="output_role_id"></a> [role\_id](#output\_role\_id)
+
+Description: Atlas Cloud Provider Access role ID (echoes existing config until resource wiring in CLOUDP-379585)
 <!-- END_TF_DOCS -->
+
+## FAQ
+
+**Why does the module require mongodbatlas provider ~> 2.6?**
+
+Provider >= 2.7.0 (target: Feb 18th) adds `port_mapping_enabled` on `mongodbatlas_privatelink_endpoint`, required for port-mapped PSC architecture. The `~> 2.6` constraint allows this upgrade.
+
+**How does region format work?**
+
+All region variables accept both GCP format (`us-east4`) and Atlas format (`US_EAST_4`). The module normalizes internally using a static 41-entry mapping.
+
+**Why is there no encryption private endpoint support?**
+
+Atlas does not support private endpoints for GCP KMS. Only AWS KMS (via PrivateLink) and Azure Key Vault (via Private Link) are supported.
+
+**What is the difference between `privatelink_endpoints` and `privatelink_endpoints_single_region`?**
+
+`privatelink_endpoints` is for multi-region deployments (unique region per entry, region used as `for_each` key). `privatelink_endpoints_single_region` is for multiple VPCs in the same region (list index as key). They are mutually exclusive.
+
+## License
+
+See [LICENSE](LICENSE) for full details.
