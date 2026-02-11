@@ -1,4 +1,33 @@
 # ─────────────────────────────────────────────────────────────────────────────
+# Region Validations (format-aware, post-normalization)
+# ─────────────────────────────────────────────────────────────────────────────
+
+resource "terraform_data" "region_validations" {
+  lifecycle {
+    precondition {
+      condition     = length(local._pl_unknown) == 0
+      error_message = "Unknown region(s) in privatelink_endpoints: [${join(", ", local._pl_unknown)}]. Must be valid Atlas (e.g. US_EAST_4) or GCP (e.g. us-east4) format."
+    }
+    precondition {
+      condition     = length(local._pl_duplicates) == 0
+      error_message = "Cross-format duplicate(s) in privatelink_endpoints, same GCP region after normalization: [${join(", ", local._pl_duplicates)}]."
+    }
+    precondition {
+      condition     = length(local._pl_sr_unknown) == 0
+      error_message = "Unknown region(s) in privatelink_endpoints_single_region: [${join(", ", local._pl_sr_unknown)}]."
+    }
+    precondition {
+      condition     = length(local._byoe_unknown) == 0
+      error_message = "Unknown region(s) in privatelink_byoe_regions: [${join(", ", local._byoe_unknown)}]."
+    }
+    precondition {
+      condition     = length(local._pl_byoe_overlap) == 0
+      error_message = "Overlap between privatelink_endpoints and privatelink_byoe_regions after normalization: [${join(", ", local._pl_byoe_overlap)}]."
+    }
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Cloud Provider Access
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -40,4 +69,3 @@ resource "mongodbatlas_privatelink_endpoint" "this" {
 
   depends_on = [mongodbatlas_private_endpoint_regional_mode.this]
 }
-
