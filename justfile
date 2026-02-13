@@ -246,3 +246,15 @@ sdlc-validate:
 
 validate-regions-gcp:
     just validate-regions gcp --output-format variable
+
+dev-vars-gcp:
+    {{py}} dev.dev_vars gcp
+
+plan-snapshot-test-gcp:
+    just plan-snapshot-test --var-file {{justfile_directory()}}/tests/workspace_gcp_examples/dev.tfvars
+
+apply-examples-gcp:
+    just apply-examples --var-file {{justfile_directory()}}/tests/workspace_gcp_examples/dev.tfvars
+
+destroy-examples-gcp:
+    just destroy-examples --var-file {{justfile_directory()}}/tests/workspace_gcp_examples/dev.tfvars

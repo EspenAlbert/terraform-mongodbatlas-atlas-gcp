@@ -3,6 +3,8 @@ locals {
 
   # Key ring gets project ID prefix to avoid collisions across Atlas projects in the same GCP project+location
   # Prefix with "atlas-" to guarantee the name starts with a letter (GCP requirement)
+  # GCP key ring names: 1-63 chars, [a-zA-Z][a-zA-Z0-9_-]*
+  # Auto-generated: "atlas-" (6) + project_id (24 hex) + "-keyring" (8) = 38 chars
   # Crypto key name needs no prefix -- it's already scoped within the key ring
   key_ring_name   = var.create_kms_key.key_ring_name != null ? var.create_kms_key.key_ring_name : "atlas-${var.project_id}-keyring"
   crypto_key_name = var.create_kms_key.crypto_key_name != null ? var.create_kms_key.crypto_key_name : "atlas-encryption-key"
@@ -11,11 +13,18 @@ locals {
     google_kms_crypto_key.atlas[0].primary[0].name
   ) : var.key_version_resource_id
 
-  # Derive crypto_key_id for IAM bindings
+  # Derive crypto_key_id and kms_location from key_version_resource_id for user-provided keys
   # Format: projects/{p}/locations/{l}/keyRings/{kr}/cryptoKeys/{ck}/cryptoKeyVersions/{v}
+  _kvri_parts = local.create_kms_key ? null : regex(
+    "projects/[^/]+/locations/(?P<location>[^/]+)/keyRings/[^/]+/cryptoKeys/(?P<crypto_key>[^/]+)/cryptoKeyVersions/",
+    var.key_version_resource_id
+  )
+
   crypto_key_id = local.create_kms_key ? (
     google_kms_crypto_key.atlas[0].id
   ) : regex("(.+)/cryptoKeyVersions/", var.key_version_resource_id)[0]
+
+  kms_location = local.create_kms_key ? var.create_kms_key.location : local._kvri_parts.location
 }
 
 # Module-Managed KMS Key (when create_kms_key.enabled = true)

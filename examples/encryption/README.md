@@ -1,5 +1,9 @@
-<!-- This file is used to generate the examples/README.md files -->
-# {{ .NAME }}
+<!-- @generated
+WARNING: This file is auto-generated. Do not edit directly.
+Changes will be overwritten when documentation is regenerated.
+Run 'just gen-examples' to regenerate.
+-->
+# GCP Cloud KMS Integration (User-Provided)
 
 ## Pre Requirements
 
@@ -18,7 +22,6 @@ To use MongoDB Atlas through Terraform, ensure you meet the following requiremen
 terraform init # this will download the required providers and create a `terraform.lock.hcl` file.
 # configure authentication env-vars (MONGODB_ATLAS_XXX)
 # configure your `vars.tfvars` with `project_id={PROJECT_ID}`
-{{ .PRODUCTION_CONSIDERATIONS_COMMENT }}
 terraform apply -var-file vars.tfvars
 # View resource IDs created by the module
 terraform output resource_ids
@@ -26,8 +29,46 @@ terraform output resource_ids
 terraform destroy -var-file vars.tfvars
 ```
 
-{{ .CODE_SNIPPET }}
-{{ .PRODUCTION_CONSIDERATIONS }}
+## Code Snippet
+
+Copy and use this code to get started quickly:
+
+**main.tf**
+```hcl
+resource "google_kms_key_ring" "atlas" {
+  name     = var.key_ring_name
+  location = var.gcp_region
+  project  = var.gcp_project_id
+}
+
+resource "google_kms_crypto_key" "atlas" {
+  name     = "atlas-encryption-key"
+  key_ring = google_kms_key_ring.atlas.id
+  purpose  = "ENCRYPT_DECRYPT"
+}
+
+module "atlas_gcp" {
+  source  = "terraform-mongodbatlas-modules/atlas-gcp/mongodbatlas"
+  project_id = var.project_id
+
+  encryption = {
+    enabled                 = true
+    key_version_resource_id = google_kms_crypto_key.atlas.primary[0].name
+  }
+
+  gcp_tags = var.gcp_tags
+}
+
+output "encryption" {
+  value = module.atlas_gcp.encryption
+}
+```
+
+**Additional files needed:**
+- [variables.tf](./variables.tf)
+- [versions.tf](./versions.tf)
+
+
 
 ## Feedback or Help
 
