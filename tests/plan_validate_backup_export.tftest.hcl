@@ -1,0 +1,186 @@
+mock_provider "mongodbatlas" {}
+mock_provider "google" {}
+
+variables {
+  project_id = "000000000000000000000000"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Disabled Default
+# ─────────────────────────────────────────────────────────────────────────────
+
+run "backup_export_disabled_default" {
+  command = plan
+  assert {
+    condition     = output.export_bucket_id == null
+    error_message = "Expected null export_bucket_id when disabled"
+  }
+  assert {
+    condition     = output.backup_export == null
+    error_message = "Expected null backup_export output when disabled"
+  }
+  assert {
+    condition     = output.resource_ids.bucket_name == null
+    error_message = "Expected null bucket_name in resource_ids when disabled"
+  }
+  assert {
+    condition     = output.resource_ids.bucket_url == null
+    error_message = "Expected null bucket_url in resource_ids when disabled"
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Module-Managed Bucket
+# ─────────────────────────────────────────────────────────────────────────────
+
+run "backup_export_create_bucket_explicit_name" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled       = true
+      create_bucket = { enabled = true, name = "my-atlas-bucket", location = "us-east4" }
+    }
+  }
+  assert {
+    condition     = output.resource_ids.bucket_name == "my-atlas-bucket"
+    error_message = "Expected bucket_name to match explicit name"
+  }
+}
+
+run "backup_export_create_bucket_default_name" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled       = true
+      create_bucket = { enabled = true, location = "us-east4" }
+    }
+  }
+  assert {
+    condition     = startswith(output.resource_ids.bucket_name, "atlas-backup-")
+    error_message = "Expected default bucket_name to start with atlas-backup-"
+  }
+  assert {
+    condition     = strcontains(output.resource_ids.bucket_name, "000000000000000000000000")
+    error_message = "Expected default bucket_name to contain project_id"
+  }
+}
+
+run "backup_export_create_bucket_with_suffix" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled       = true
+      create_bucket = { enabled = true, name_suffix = "-dev", location = "us-east4" }
+    }
+  }
+  assert {
+    condition     = endswith(output.resource_ids.bucket_name, "-dev")
+    error_message = "Expected bucket_name to end with -dev suffix"
+  }
+  assert {
+    condition     = startswith(output.resource_ids.bucket_name, "atlas-backup-")
+    error_message = "Expected bucket_name to start with atlas-backup-"
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Region Normalization
+# ─────────────────────────────────────────────────────────────────────────────
+
+run "backup_export_atlas_region_format" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled       = true
+      create_bucket = { enabled = true, location = "US_EAST_4" }
+    }
+  }
+  assert {
+    condition     = output.backup_export.bucket_location == "us-east4"
+    error_message = "Expected location normalized from US_EAST_4 to us-east4, got: ${output.backup_export.bucket_location}"
+  }
+  assert {
+    condition     = startswith(output.resource_ids.bucket_name, "atlas-backup-")
+    error_message = "Expected default bucket_name with Atlas region format input"
+  }
+}
+
+run "backup_export_gcp_region_passthrough" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled       = true
+      create_bucket = { enabled = true, location = "us-west4" }
+    }
+  }
+  assert {
+    condition     = output.backup_export != null
+    error_message = "Expected non-null backup_export with GCP region format"
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# User-Provided Bucket
+# ─────────────────────────────────────────────────────────────────────────────
+
+run "backup_export_user_bucket" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled     = true
+      bucket_name = "existing-bucket"
+    }
+  }
+  assert {
+    condition     = output.resource_ids.bucket_name == "existing-bucket"
+    error_message = "Expected bucket_name to match user-provided name"
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dedicated Role
+# ─────────────────────────────────────────────────────────────────────────────
+
+run "backup_export_dedicated_role" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled                = true
+      bucket_name            = "existing-bucket"
+      dedicated_role_enabled = true
+    }
+  }
+  assert {
+    condition     = output.backup_export != null
+    error_message = "Expected non-null backup_export output with dedicated role"
+  }
+  # backup_export_role_id and backup_export_service_account are unknown at plan time
+  # (created by dedicated CPA module), so we cannot assert != null here.
+  # The non-null backup_export output confirms the module was wired correctly.
+}
+
+run "backup_export_dedicated_role_with_encryption" {
+  command = plan
+  variables {
+    backup_export = {
+      enabled                = true
+      bucket_name            = "existing-bucket"
+      dedicated_role_enabled = true
+    }
+    encryption = {
+      enabled                 = true
+      key_version_resource_id = "projects/p/locations/l/keyRings/kr/cryptoKeys/ck/cryptoKeyVersions/1"
+      dedicated_role_enabled  = true
+    }
+  }
+  assert {
+    condition     = output.backup_export != null
+    error_message = "Expected non-null backup_export when both features use dedicated roles"
+  }
+  assert {
+    condition     = output.encryption != null
+    error_message = "Expected non-null encryption when both features use dedicated roles"
+  }
+  # role_id and service_account outputs are unknown at plan time for both
+  # dedicated CPA modules -- verified via non-null feature outputs above.
+}
