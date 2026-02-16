@@ -38,7 +38,17 @@ output "resource_ids" {
 
 output "privatelink" {
   description = "PrivateLink status per endpoint key"
-  value       = {} # TODO: wire when privatelink submodule is built
+  value = {
+    for k, pl in module.privatelink : k => {
+      private_link_id     = pl.private_link_id
+      endpoint_service_id = pl.endpoint_service_id
+      endpoint_ip         = pl.endpoint_ip
+      status              = pl.status
+      error_message       = pl.error_message
+      gcp_endpoint_status = pl.gcp_endpoint_status
+      forwarding_rule_id  = pl.forwarding_rule_id
+    }
+  }
 }
 
 output "privatelink_service_info" {

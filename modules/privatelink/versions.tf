@@ -4,7 +4,7 @@ terraform {
   required_providers {
     mongodbatlas = {
       source  = "mongodb/mongodbatlas"
-      version = "~> 2.6" # TODO(CLOUDP-381477): temporary until provider ~> 2.7 is released
+      version = ">= 2.6"
     }
     google = {
       source  = "hashicorp/google"
@@ -13,13 +13,7 @@ terraform {
   }
 
   provider_meta "mongodbatlas" {
-    module_name    = "atlas-gcp"
+    module_name    = "atlas-gcp/privatelink"
     module_version = "local"
   }
-}
-
-provider "mongodbatlas" {}
-provider "google" {
-  project = var.gcp_project_id
-  region  = var.gcp_region
 }
