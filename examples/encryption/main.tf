@@ -22,11 +22,12 @@ module "atlas_gcp" {
   gcp_tags = var.gcp_tags
 }
 
-output "encryption" {
-  value = module.atlas_gcp.encryption
+# pass to cluster module's encryption_at_rest_provider = "GCP"
+output "encryption_at_rest_provider" {
+  value = module.atlas_gcp.encryption_at_rest_provider
 }
 
-output "resource_ids" {
-  description = "All resource IDs created by the module"
-  value       = module.atlas_gcp.resource_ids
+# status and configuration of the encryption at rest configuration
+output "encryption" {
+  value = module.atlas_gcp.encryption
 }
