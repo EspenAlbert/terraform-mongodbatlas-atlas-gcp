@@ -110,9 +110,10 @@ variable "encryption" {
 
 variable "privatelink_endpoints" {
   type = list(object({
-    region     = string
-    subnetwork = string
-    labels     = optional(map(string), {})
+    region      = string
+    subnetwork  = string
+    labels      = optional(map(string), {})
+    name_prefix = optional(string)
   }))
   default     = []
   description = <<-EOT
@@ -130,19 +131,34 @@ variable "privatelink_endpoints" {
     - `subnetwork` is a self_link (e.g., `google_compute_subnetwork.this.self_link`).
       The VPC network is derived from the subnetwork -- no separate `network` input is needed.
     - `labels` are applied to the GCP forwarding rule and compute address resources.
+    - `name_prefix` sets the prefix for the GCP compute address (`{name_prefix}ip`) and
+      forwarding rule (`{name_prefix}fr`). When omitted, defaults to `atlas-psc-{region}-`
+      where region is in GCP format (e.g., `atlas-psc-us-east4-`). Set a custom prefix when
+      multiple deployments share the same GCP project and region to avoid name collisions.
   EOT
 
   validation {
     condition     = length(var.privatelink_endpoints) == length(distinct([for ep in var.privatelink_endpoints : ep.region]))
     error_message = "All regions in privatelink_endpoints must be unique. Use privatelink_endpoints_single_region for multiple endpoints in the same region."
   }
+
+  validation {
+    condition = alltrue([
+      for ep in var.privatelink_endpoints :
+      ep.name_prefix == null || (
+        can(regex("^[a-z][a-z0-9-]*$", ep.name_prefix)) && length(ep.name_prefix) <= 61
+      )
+    ])
+    error_message = "name_prefix must start with a lowercase letter, contain only lowercase letters/digits/hyphens, and be at most 61 characters (63 char GCP limit minus 2 for 'ip'/'fr' suffix)."
+  }
 }
 
 variable "privatelink_endpoints_single_region" {
   type = list(object({
-    region     = string
-    subnetwork = string
-    labels     = optional(map(string), {})
+    region      = string
+    subnetwork  = string
+    labels      = optional(map(string), {})
+    name_prefix = optional(string)
   }))
   default     = []
   description = <<-EOT
@@ -152,8 +168,12 @@ variable "privatelink_endpoints_single_region" {
     connectivity to the same Atlas project. It uses the list index as the `for_each`
     key (not the region), since the region is identical for all entries.
 
-    Same object shape as `privatelink_endpoints`. Mutually exclusive with
-    `privatelink_endpoints`.
+    Mutually exclusive with `privatelink_endpoints`.
+
+    - `name_prefix` sets the prefix for the GCP compute address (`{name_prefix}ip`) and
+      forwarding rule (`{name_prefix}fr`). When omitted, defaults to `atlas-psc-{index}-`
+      where index is the list position (e.g., `atlas-psc-0-`). Recommended to set explicitly
+      since index-based defaults are not descriptive.
   EOT
 
   validation {
@@ -164,6 +184,16 @@ variable "privatelink_endpoints_single_region" {
   validation {
     condition     = length(var.privatelink_endpoints_single_region) == 0 || length(var.privatelink_endpoints) == 0
     error_message = "Cannot use both privatelink_endpoints and privatelink_endpoints_single_region."
+  }
+
+  validation {
+    condition = alltrue([
+      for ep in var.privatelink_endpoints_single_region :
+      ep.name_prefix == null || (
+        can(regex("^[a-z][a-z0-9-]*$", ep.name_prefix)) && length(ep.name_prefix) <= 61
+      )
+    ])
+    error_message = "name_prefix must start with a lowercase letter, contain only lowercase letters/digits/hyphens, and be at most 61 characters (63 char GCP limit minus 2 for 'ip'/'fr' suffix)."
   }
 }
 
