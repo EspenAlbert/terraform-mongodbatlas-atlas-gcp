@@ -63,7 +63,7 @@ resource "mongodbatlas_project" "this" {
 }
 ```
 
-Replace the `var.project_id` with `mongodbatlas_project.this.id` in the [main.tf](https://github.com/EspenAlbert/terraform-mongodbatlas-atlas-gcp/blob/v0.0.1/examples/encryption/main.tf) file.
+Replace the `var.project_id` with `mongodbatlas_project.this.id` in the [main.tf](./main.tf) file.
 
 <!-- END_GETTING_STARTED -->
 
@@ -86,8 +86,7 @@ resource "google_kms_crypto_key" "atlas" {
 }
 
 module "atlas_gcp" {
-  source  = "EspenAlbert/atlas-gcp/mongodbatlas"
-  version = "v0.0.1"
+  source  = "terraform-mongodbatlas-modules/atlas-gcp/mongodbatlas"
   project_id = var.project_id
 
   encryption = {
@@ -110,8 +109,8 @@ output "encryption" {
 ```
 
 **Additional files needed:**
-- [variables.tf](https://github.com/EspenAlbert/terraform-mongodbatlas-atlas-gcp/blob/v0.0.1/examples/encryption/variables.tf)
-- [versions.tf](https://github.com/EspenAlbert/terraform-mongodbatlas-atlas-gcp/blob/v0.0.1/examples/encryption/versions.tf)
+- [variables.tf](./variables.tf)
+- [versions.tf](./versions.tf)
 
 
 
